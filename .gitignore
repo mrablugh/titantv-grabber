@@ -16,8 +16,8 @@ titantv-grabber.env
 # TitanTV runtime/generated data
 titantv.db
 *.db
-xmltv.xml
-*.xml
+#xmltv.xml
+#*.xml
 channel_dump.json
 *_dump.json
 
