@@ -218,9 +218,12 @@ def generate_xml(conn, output_file='xmltv.xml'):
     channels = c.fetchall()
     
     for ch_id, num, call, logo in channels:
-        ch_elm = ET.SubElement(root, 'channel', id=str(num))
+        # Provide a safe fallback if the callsign is empty or missing
+        safe_call = call if call and call.strip() else f"CH_{num}"
+        
+        ch_elm = ET.SubElement(root, 'channel', id=safe_call)
         dn = ET.SubElement(ch_elm, 'display-name')
-        dn.text = f"{num} {call}"
+        dn.text = safe_call
         if logo:
             ET.SubElement(ch_elm, 'icon', src=logo)
             
@@ -232,7 +235,7 @@ def generate_xml(conn, output_file='xmltv.xml'):
         SELECT p.title, p.sub_title, p.description, p.image_url, p.start_time, p.end_time,
                p.year, p.genres, p.program_type, p.season_num, p.episode_num, 
                p.rating, p.star_rating, p.is_new, p.original_air_date, p.new_repeat,
-               c.channel_number
+               c.channel_number, c.callsign
         FROM programs p
         JOIN channels c ON p.channel_id = c.id
         WHERE p.start_time >= ?
@@ -243,15 +246,18 @@ def generate_xml(conn, output_file='xmltv.xml'):
     
     for prog in programs:
         (title, subtitle, desc, img, start, end, year, genres_json, ptype, 
-         s_num, e_num, rating, stars, is_new, air_date, new_repeat, ch_num) = prog
+         s_num, e_num, rating, stars, is_new, air_date, new_repeat, ch_num, callsign) = prog
          
+        # Ensure the program maps to the same safe fallback
+        safe_call = callsign if callsign and callsign.strip() else f"CH_{ch_num}"
+        
         start_dt = datetime.datetime.fromtimestamp(start)
         end_dt = datetime.datetime.fromtimestamp(end)
         
         start_str = start_dt.strftime('%Y%m%d%H%M%S -0500') # Hardcoded EST for now matching old scraper buffer
         end_str = end_dt.strftime('%Y%m%d%H%M%S -0500')
         
-        p_elm = ET.SubElement(root, 'programme', start=start_str, stop=end_str, channel=str(ch_num))
+        p_elm = ET.SubElement(root, 'programme', start=start_str, stop=end_str, channel=safe_call)
         
         ET.SubElement(p_elm, 'title').text = title
         if subtitle: ET.SubElement(p_elm, 'sub-title').text = subtitle
@@ -310,8 +316,13 @@ def main():
     parser = argparse.ArgumentParser(description='TitanTV Native Scraper')
     parser.add_argument('--user', required=True, help='TitanTV User ID (UUID)')
     parser.add_argument('--lineup', help='Lineup ID (UUID). If not provided, will try to fetch.')
+    parser.add_argument('--db', default='titantv.db', help='Custom database file name')
+    parser.add_argument('--out', default='xmltv.xml', help='Custom output XML file name')
     
     args = parser.parse_args()
+    
+    global DB_FILE
+    DB_FILE = args.db
     
     init_db()
     conn = sqlite3.connect(DB_FILE)
@@ -409,7 +420,7 @@ def main():
     
     # GENERATE XML
     print("Generating XMLTV...")
-    generate_xml(conn)
+    generate_xml(conn, output_file=args.out)
     print("Done.")
 
 if __name__ == "__main__":
