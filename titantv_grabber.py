@@ -251,11 +251,13 @@ def generate_xml(conn, output_file='xmltv.xml'):
         # Ensure the program maps to the same safe fallback
         safe_call = callsign if callsign and callsign.strip() else f"CH_{ch_num}"
         
-        start_dt = datetime.datetime.fromtimestamp(start)
-        end_dt = datetime.datetime.fromtimestamp(end)
+        # Convert to local timezone-aware objects to capture DST correctly
+        start_dt = datetime.datetime.fromtimestamp(start).astimezone()
+        end_dt = datetime.datetime.fromtimestamp(end).astimezone()
         
-        start_str = start_dt.strftime('%Y%m%d%H%M%S -0500') # Hardcoded EST for now matching old scraper buffer
-        end_str = end_dt.strftime('%Y%m%d%H%M%S -0500')
+        # Use %z to dynamically output the correct system offset (-0400 or -0500)
+        start_str = start_dt.strftime('%Y%m%d%H%M%S %z')
+        end_str = end_dt.strftime('%Y%m%d%H%M%S %z')
         
         p_elm = ET.SubElement(root, 'programme', start=start_str, stop=end_str, channel=safe_call)
         
